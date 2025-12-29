@@ -7,6 +7,7 @@
 #include <LittleFS.h>
 #include <WiFiManager.h>
 #include <atomic>
+#include "StatusLED.h"
 
 #define FORMAT_LITTLEFS_IF_FAILED true
 
@@ -30,7 +31,7 @@ public:
 class ConfigManager {
 public:
   ConfigManager();
-  void begin();
+  void begin(StatusLED& led);
 
   void configPortalTask(void *parameter);
   void stopConfigPortalTask();
@@ -40,6 +41,7 @@ public:
 
 private:
   WiFiManager wifiManager;
+  StatusLED* _statusLed = nullptr;
 
   void loadConfig();
   void saveConfig();

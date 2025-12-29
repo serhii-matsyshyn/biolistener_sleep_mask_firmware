@@ -39,7 +39,9 @@ ConfigManager::ConfigManager()
     wifiNameWithChipId = wifiName + "_" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
 }
 
-void ConfigManager::begin() {
+void ConfigManager::begin(StatusLED& led) {
+  _statusLed = &led;
+  WiFi.setAutoReconnect(true);
   Serial.println("Mounting FS...");
   if (LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
     Serial.println("Mounted file system");
@@ -65,13 +67,16 @@ void ConfigManager::begin() {
 
   if (wifiManager.autoConnect(wifiNameWithChipId.c_str())) {
     Serial.println("Connected to WiFi");
+    _statusLed->setColor(StatusLED::GREEN);
   } else {
-    Serial.println("Failed to connect to WiFi!");
+    Serial.println("Failed to connect to WiFi! Starting non-blocking config portal.");
+    _statusLed->setColor(StatusLED::BLUE);
   }
 
   Serial.println("Starting config portal for params configuration");
 
   wifiManager.setConfigPortalTimeout(120);
+  wifiManager.setConnectRetries(3);
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.startConfigPortal(wifiNameWithChipId.c_str());
 }
@@ -130,8 +135,19 @@ void ConfigManager::saveConfigCallback() {
 }
 
 void ConfigManager::configPortalTask(void *parameter) {
+  unsigned long lastCheck = 0;
   while (shouldProcessConfigPortal) {
     wifiManager.process();
+    
+    unsigned long now = millis();
+    if (now - lastCheck > 5000) { // Check every 5 seconds
+      lastCheck = now;
+      if (WiFi.status() == WL_CONNECTED) {
+        _statusLed->setColor(StatusLED::GREEN);
+      } else {
+        _statusLed->setColor(StatusLED::BLUE);
+      }
+    }
     delay(1);
   }
 

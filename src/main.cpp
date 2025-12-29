@@ -38,18 +38,8 @@ void setup() {
   strobe.setFillCycle(0.1f);
   strobe.setBrightness(0.5f);
   
-  configManager.begin();
-  
-  if (WiFi.status() != WL_CONNECTED) {
-    statusLed.setColor(StatusLED::BLUE); // Connecting
-  }
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nConnected to WiFi");
-  statusLed.setColor(StatusLED::GREEN); // Ready
+  configManager.begin(statusLed);
+  Serial.println("WiFi connection initiated (non-blocking)");
 
   udpManager.begin();
   powerManager.begin();
