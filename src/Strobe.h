@@ -45,7 +45,7 @@ private:
     std::atomic<uint32_t> _intervalOn_us;
     std::atomic<uint32_t> _intervalOff_us;
 
-    std::atomic<uint32_t> _lastToggleTime_us;
+    std::atomic<int64_t> _lastToggleTime_us;
     std::atomic<bool> _currentState;
 
     std::atomic<uint64_t> _bitmask;

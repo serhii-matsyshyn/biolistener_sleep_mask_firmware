@@ -40,7 +40,7 @@ void Strobe::begin() {
     
     // Pre-calculate intervals
     updateIntervals();
-    _lastToggleTime_us.store((uint32_t)esp_timer_get_time());
+    _lastToggleTime_us.store(esp_timer_get_time());
 
     // Start the hardware timer at 100us interval
     // This provides 100us resolution for the strobe.
@@ -135,9 +135,9 @@ void Strobe::strobeTask(void* parameter) {
 }
 
 void IRAM_ATTR Strobe::onTimerTick() {
-    uint32_t now = (uint32_t)esp_timer_get_time();
-    uint32_t last = _lastToggleTime_us.load();
-    uint32_t elapsed = now - last;
+    int64_t now = esp_timer_get_time();
+    int64_t last = _lastToggleTime_us.load();
+    int64_t elapsed = now - last;
     uint32_t currentInterval = _currentState.load() ? _intervalOn_us.load() : _intervalOff_us.load();
 
     if (elapsed >= currentInterval) {

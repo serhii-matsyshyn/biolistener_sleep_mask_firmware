@@ -14,7 +14,7 @@
 #endif
 
 #define BUTTON_PIN 10
-#define NUMPIXELS 16
+#define NUMPIXELS 8
 
 Strobe strobe(NUMPIXELS, LED_PIN, NEO_GRBW + NEO_KHZ800);
 StatusLED statusLed(STATUS_LED_PIN);
