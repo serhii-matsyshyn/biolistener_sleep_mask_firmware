@@ -30,7 +30,7 @@ public:
     uint64_t getBitmask() const { return _bitmask.load(); }
 
     static void strobeTask(void* parameter);
-    static bool IRAM_ATTR timerHandler(void* arg);
+    void onTimerTick();
 
 private:
     Adafruit_NeoPixel _pixels;
@@ -42,8 +42,12 @@ private:
     std::atomic<float> _brightness;
     std::atomic<bool> _enabled;
     
-    std::atomic<uint32_t> _intervalOn_ms;
-    std::atomic<uint32_t> _intervalOff_ms;
+    std::atomic<uint32_t> _intervalOn_us;
+    std::atomic<uint32_t> _intervalOff_us;
+
+    std::atomic<uint32_t> _intervalOn_ticks;
+    std::atomic<uint32_t> _intervalOff_ticks;
+    std::atomic<int32_t> _tickCounter;
 
     std::atomic<uint64_t> _bitmask;
     

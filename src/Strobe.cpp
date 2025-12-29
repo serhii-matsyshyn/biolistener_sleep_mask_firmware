@@ -3,17 +3,14 @@
 
 // Global/Static timer instances for ISR access
 static ESP32Timer ITimer(0);
-static ESP32_ISR_Timer ISR_Timer;
-
-bool IRAM_ATTR TimerHandler(void* arg) {
-    ISR_Timer.run();
-    return true;
-}
 
 Strobe* g_strobeInstance = nullptr;
 
-void IRAM_ATTR StrobeCallback(void* arg) {
-    Strobe::timerHandler(arg);
+bool IRAM_ATTR TimerHandler(void* arg) {
+    if (g_strobeInstance) {
+        g_strobeInstance->onTimerTick();
+    }
+    return true;
 }
 
 Strobe::Strobe(uint16_t numPixels, uint8_t pin, neoPixelType type)
@@ -21,7 +18,9 @@ Strobe::Strobe(uint16_t numPixels, uint8_t pin, neoPixelType type)
       _frequency(1.0f), _fillCycle(0.5f), _color(0xFFFFFF), _brightness(1.0f),
       _enabled(false), _currentState(false), _lastUpdateColor(0), 
       _lastUpdateBrightness(-1.0f), _taskHandle(NULL), _eventQueue(NULL), _timerId(-1),
-      _intervalOn_ms(50), _intervalOff_ms(50), _bitmask(0xFFFFFFFFFFFFFFFFULL) {
+      _intervalOn_us(500000), _intervalOff_us(500000), 
+      _intervalOn_ticks(5000), _intervalOff_ticks(5000), _tickCounter(5000),
+      _bitmask(0xFFFFFFFFFFFFFFFFULL) {
     g_strobeInstance = this;
 }
 
@@ -40,6 +39,9 @@ void Strobe::begin() {
 
     _eventQueue = xQueueCreate(20, sizeof(StrobeEvent));
     
+    // Pre-calculate intervals
+    updateIntervals();
+
     // Start the hardware timer at 100us interval
     // This provides 100us resolution for the strobe.
     if (ITimer.attachInterruptInterval(100, (esp32_timer_callback)TimerHandler)) {
@@ -57,16 +59,6 @@ void Strobe::begin() {
         &_taskHandle,
         1 // Core 1
     );
-
-    // Pre-calculate intervals
-    updateIntervals();
-
-    // Start the timer immediately and keep it running
-    float freq = _frequency.load();
-    float fill = _fillCycle.load();
-    uint32_t interval_us = (uint32_t)((1000000.0f / freq) * fill);
-    if (interval_us < 100) interval_us = 100;
-    _timerId = ISR_Timer.setInterval(interval_us / 100, StrobeCallback, (void*)this);
 }
 
 void Strobe::start() {
@@ -117,14 +109,17 @@ void Strobe::updateIntervals() {
     float freq = _frequency.load();
     float fill = _fillCycle.load();
     
-    uint32_t on = (uint32_t)((1000000.0f / freq) * fill);
-    uint32_t off = (uint32_t)((1000000.0f / freq) * (1.0f - fill));
+    uint32_t on_us = (uint32_t)((1000000.0f / freq) * fill);
+    uint32_t off_us = (uint32_t)((1000000.0f / freq) * (1.0f - fill));
     
-    if (on < 100) on = 100;
-    if (off < 100) off = 100;
+    if (on_us < 100) on_us = 100;
+    if (off_us < 100) off_us = 100;
     
-    _intervalOn_ms.store(on);
-    _intervalOff_ms.store(off);
+    _intervalOn_us.store(on_us);
+    _intervalOff_us.store(off_us);
+
+    _intervalOn_ticks.store(on_us / 100);
+    _intervalOff_ticks.store(off_us / 100);
 }
 
 void Strobe::setBitmask(uint64_t mask) {
@@ -142,29 +137,21 @@ void Strobe::strobeTask(void* parameter) {
     }
 }
 
-bool IRAM_ATTR Strobe::timerHandler(void* arg) {
-    Strobe* instance = static_cast<Strobe*>(arg);
-    // Timer always runs to keep the phase accurate
-
-    instance->_currentState = !instance->_currentState;
-    
-    uint32_t interval_us;
-    if (instance->_currentState) {
-        interval_us = instance->_intervalOn_ms.load();
-    } else {
-        interval_us = instance->_intervalOff_ms.load();
+void IRAM_ATTR Strobe::onTimerTick() {
+    int32_t nextTicks = _tickCounter.fetch_sub(1) - 1;
+    if (nextTicks <= 0) {
+        _currentState = !_currentState;
+        uint32_t reload = _currentState ? _intervalOn_ticks.load() : _intervalOff_ticks.load();
+        _tickCounter.store(reload);
+        
+        if (_enabled.load()) {
+            StrobeEvent ev = {_currentState};
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xQueueSendFromISR(_eventQueue, &ev, &xHigherPriorityTaskWoken);
+            // The yield is handled by the return value of TimerHandler if needed,
+            // but here we are inside a method called by TimerHandler.
+        }
     }
-
-    if (interval_us < 100) interval_us = 100;
-
-    // Change the interval for the next trigger (in 100us units)
-    ISR_Timer.changeInterval(instance->_timerId, interval_us / 100);
-    
-    StrobeEvent ev = {instance->_currentState};
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xQueueSendFromISR(instance->_eventQueue, &ev, &xHigherPriorityTaskWoken);
-    
-    return xHigherPriorityTaskWoken == pdTRUE;
 }
 
 void Strobe::updateLeds(bool state) {
