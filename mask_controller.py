@@ -119,6 +119,9 @@ if __name__ == "__main__":
                 continue
 
             logger.info(f"Board {controller.board_ip} connected. Sending step {step % 4}...")
+
+            # controller.update_params(enabled=True, frequency=5.0, color=[0, 0, 0, 255])
+            # break
             
             # Demo logic
             case = step % 4

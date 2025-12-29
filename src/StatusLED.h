@@ -12,15 +12,6 @@ private:
     uint8_t _brightness;
     SemaphoreHandle_t _mutex;
 
-    static constexpr uint32_t PREDEFINED_COLORS[] = {
-        0xFF0000, // RED
-        0x00FF00, // GREEN
-        0x0000FF, // BLUE
-        0xFFFF00, // YELLOW
-        0xFFFFFF, // WHITE
-        0x000000  // OFF
-    };
-
 public:
     enum Color {
         RED,
@@ -63,7 +54,16 @@ public:
     }
 
     void setColor(Color color) {
-        uint32_t colorValue = PREDEFINED_COLORS[color];
+        uint32_t colorValue = 0;
+        switch (color) {
+            case RED:    colorValue = 0xFF0000; break;
+            case GREEN:  colorValue = 0x00FF00; break;
+            case BLUE:   colorValue = 0x0000FF; break;
+            case YELLOW: colorValue = 0xFFFF00; break;
+            case WHITE:  colorValue = 0xFFFFFF; break;
+            case OFF:    colorValue = 0x000000; break;
+        }
+        
         if (colorValue != _lastColor) {
             if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
                 _strip->setPixelColor(0, colorValue);

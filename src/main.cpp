@@ -3,6 +3,7 @@
 #include "ConfigManager.h"
 #include "StatusLED.h"
 #include "UdpManager.h"
+#include "PowerManager.h"
 
 #ifndef LED_PIN
 #define LED_PIN 7
@@ -12,19 +13,23 @@
 #define STATUS_LED_PIN 21
 #endif
 
+#define BUTTON_PIN 10
 #define NUMPIXELS 16
 
 Strobe strobe(NUMPIXELS, LED_PIN, NEO_GRBW + NEO_KHZ800);
 StatusLED statusLed(STATUS_LED_PIN);
 ConfigManager configManager;
 UdpManager udpManager(strobe, configManager, statusLed);
+PowerManager powerManager(BUTTON_PIN, statusLed, strobe);
 
 void setup() {
+  statusLed.begin();
+  powerManager.checkWakeup();
+
   Serial.begin(1000000);
   delay(1000);
   Serial.println("Starting Mask Device");
 
-  statusLed.begin();
   statusLed.setColor(StatusLED::RED); // Booting
 
   strobe.begin();
@@ -47,6 +52,7 @@ void setup() {
   statusLed.setColor(StatusLED::GREEN); // Ready
 
   udpManager.begin();
+  powerManager.begin();
 
   // Launch networking tasks on Core 0
   xTaskCreatePinnedToCore(
@@ -81,6 +87,5 @@ void setup() {
 }
 
 void loop() {
-  // Main loop does nothing; everything is handled by tasks
   vTaskDelay(pdMS_TO_TICKS(1000));
 }
