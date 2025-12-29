@@ -45,9 +45,8 @@ private:
     std::atomic<uint32_t> _intervalOn_us;
     std::atomic<uint32_t> _intervalOff_us;
 
-    std::atomic<uint32_t> _intervalOn_ticks;
-    std::atomic<uint32_t> _intervalOff_ticks;
-    std::atomic<int32_t> _tickCounter;
+    std::atomic<uint32_t> _lastToggleTime_us;
+    std::atomic<bool> _currentState;
 
     std::atomic<uint64_t> _bitmask;
     
@@ -60,7 +59,6 @@ private:
     };
 
     // Internal state for the task
-    bool _currentState;
     uint32_t _lastUpdateColor;
     float _lastUpdateBrightness;
 

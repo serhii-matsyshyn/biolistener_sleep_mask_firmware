@@ -18,8 +18,7 @@ Strobe::Strobe(uint16_t numPixels, uint8_t pin, neoPixelType type)
       _frequency(1.0f), _fillCycle(0.5f), _color(0xFFFFFF), _brightness(1.0f),
       _enabled(false), _currentState(false), _lastUpdateColor(0), 
       _lastUpdateBrightness(-1.0f), _taskHandle(NULL), _eventQueue(NULL), _timerId(-1),
-      _intervalOn_us(500000), _intervalOff_us(500000), 
-      _intervalOn_ticks(5000), _intervalOff_ticks(5000), _tickCounter(5000),
+      _intervalOn_us(500000), _intervalOff_us(500000), _lastToggleTime_us(0),
       _bitmask(0xFFFFFFFFFFFFFFFFULL) {
     g_strobeInstance = this;
 }
@@ -41,6 +40,7 @@ void Strobe::begin() {
     
     // Pre-calculate intervals
     updateIntervals();
+    _lastToggleTime_us.store((uint32_t)esp_timer_get_time());
 
     // Start the hardware timer at 100us interval
     // This provides 100us resolution for the strobe.
@@ -64,7 +64,7 @@ void Strobe::begin() {
 void Strobe::start() {
     if (!_enabled.exchange(true)) {
         // Immediately update LEDs to current strobe state
-        StrobeEvent ev = {_currentState};
+        StrobeEvent ev = {_currentState.load()};
         xQueueSend(_eventQueue, &ev, 0);
     }
 }
@@ -117,9 +117,6 @@ void Strobe::updateIntervals() {
     
     _intervalOn_us.store(on_us);
     _intervalOff_us.store(off_us);
-
-    _intervalOn_ticks.store(on_us / 100);
-    _intervalOff_ticks.store(off_us / 100);
 }
 
 void Strobe::setBitmask(uint64_t mask) {
@@ -138,18 +135,24 @@ void Strobe::strobeTask(void* parameter) {
 }
 
 void IRAM_ATTR Strobe::onTimerTick() {
-    int32_t nextTicks = _tickCounter.fetch_sub(1) - 1;
-    if (nextTicks <= 0) {
-        _currentState = !_currentState;
-        uint32_t reload = _currentState ? _intervalOn_ticks.load() : _intervalOff_ticks.load();
-        _tickCounter.store(reload);
+    uint32_t now = (uint32_t)esp_timer_get_time();
+    uint32_t last = _lastToggleTime_us.load();
+    uint32_t elapsed = now - last;
+    uint32_t currentInterval = _currentState.load() ? _intervalOn_us.load() : _intervalOff_us.load();
+
+    if (elapsed >= currentInterval) {
+        bool nextState = !_currentState.load();
+        _currentState.store(nextState);
+        _lastToggleTime_us.store(now);
         
         if (_enabled.load()) {
-            StrobeEvent ev = {_currentState};
+            StrobeEvent ev = {nextState};
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            xQueueSendFromISR(_eventQueue, &ev, &xHigherPriorityTaskWoken);
-            // The yield is handled by the return value of TimerHandler if needed,
-            // but here we are inside a method called by TimerHandler.
+            if (xQueueSendFromISR(_eventQueue, &ev, &xHigherPriorityTaskWoken) == pdPASS) {
+                if (xHigherPriorityTaskWoken == pdTRUE) {
+                    portYIELD_FROM_ISR();
+                }
+            }
         }
     }
 }
