@@ -88,14 +88,15 @@ class StrobeEngine:
             "fill": float(row["Fill"])
         }
 
-    def send_update(self, time_s):
+    def send_update(self, time_s, is_playing=True):
         params = self.get_params_at_time(time_s)
         if params is None:
-            return
+            params = {"frequency": 0, "fill": 0}
 
         # Only send update if parameters changed significantly
+        # Strobe is enabled only if both UI toggle is ON and audio is playing
         current_state = {
-            "enabled": self.enabled,
+            "enabled": self.enabled and is_playing,
             "frequency": params["frequency"],
             "fill": params["fill"],
             "brightness": self.brightness,

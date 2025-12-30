@@ -30,9 +30,8 @@ def init_engines():
         # Sync loop
         def sync_worker():
             while True:
-                if audio_engine.is_playing:
-                    current_pos = audio_engine.get_current_pos()
-                    strobe_engine.send_update(current_pos)
+                current_pos = audio_engine.get_current_pos()
+                strobe_engine.send_update(current_pos, audio_engine.is_playing)
                 time.sleep(0.05)  # 20Hz update rate for strobe params
 
         threading.Thread(target=sync_worker, daemon=True).start()

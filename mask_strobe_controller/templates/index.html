@@ -386,8 +386,6 @@
             const data = await resp.json();
             if (data.status === 'success') {
                 document.getElementById('status-text').innerText = 'Loaded: ' + sound.split('/').pop();
-                document.getElementById('play-btn').disabled = false;
-                document.getElementById('pause-btn').disabled = false;
             }
         }
 
@@ -467,9 +465,13 @@
             if (data.is_playing) {
                 document.getElementById('sync-status').innerText = 'Synchronized';
                 document.getElementById('sync-status').style.color = 'var(--success)';
+                document.getElementById('play-btn').disabled = true;
+                document.getElementById('pause-btn').disabled = false;
             } else {
                 document.getElementById('sync-status').innerText = 'Paused';
                 document.getElementById('sync-status').style.color = 'var(--text-dim)';
+                document.getElementById('play-btn').disabled = (data.track === null);
+                document.getElementById('pause-btn').disabled = true;
             }
 
             document.getElementById('time-display').innerText = `${formatTime(pos)} / ${formatTime(duration)}`;
