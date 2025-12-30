@@ -15,6 +15,10 @@ app = Flask(__name__)
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+if not os.path.exists(DATA_DIR):
+    raise FileNotFoundError(f"Data directory not found at {DATA_DIR}")
+
 SESSIONS_YAML = os.path.join(DATA_DIR, "sessions.yaml")
 
 strobe_engine = None

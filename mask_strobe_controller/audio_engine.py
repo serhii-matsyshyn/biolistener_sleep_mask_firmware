@@ -1,6 +1,7 @@
 import vlc
 import os
 import logging
+import platform
 
 logger = logging.getLogger('AudioEngine')
 
@@ -13,10 +14,18 @@ class AudioEngine:
             '--quiet',
             '--file-caching=1000',
             '--clock-jitter=0',
-            '--aout=alsa'  # Force ALSA for better performance on Linux
         ]
-        self.instance = vlc.Instance(*vlc_flags)
-        self.player = self.instance.media_player_new()
+
+        if platform.system() == 'Linux':
+            vlc_flags.append('--aout=alsa')
+
+        try:
+            self.instance = vlc.Instance(*vlc_flags)
+            self.player = self.instance.media_player_new()
+        except Exception as e:
+            logger.error(f"Failed to initialize VLC: {e}")
+            raise
+
         self.current_track = None
         self.duration = 0
         self.is_playing = False
@@ -61,10 +70,6 @@ class AudioEngine:
     def seek(self, pos):
         # pos is in seconds, VLC expects milliseconds
         self.player.set_time(int(pos * 1000))
-        if not self.is_playing:
-            # If paused, we might need to play and immediately pause to force update
-            # but usually set_time works on paused media
-            pass
 
     def get_current_pos(self):
         # VLC returns time in milliseconds
