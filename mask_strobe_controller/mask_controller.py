@@ -83,7 +83,7 @@ class MaskController:
             logger.debug(f"Converted mask list to int: {mask}")
 
         if enabled is False:
-            logger.info("STROBE DISABLED")
+            logger.debug("STROBE DISABLED")
 
         # Filter out None values to only send requested changes
         updates = {
