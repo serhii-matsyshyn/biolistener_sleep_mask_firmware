@@ -82,6 +82,9 @@ class MaskController:
             mask = mask_int
             logger.debug(f"Converted mask list to int: {mask}")
 
+        if enabled is False:
+            logger.info("STROBE DISABLED")
+
         # Filter out None values to only send requested changes
         updates = {
             "enabled": enabled,
@@ -107,7 +110,7 @@ class MaskController:
 
 if __name__ == "__main__":
     controller = MaskController()
-    num_pixels = 16
+    num_pixels = 8
     step = 0
     
     try:
@@ -119,8 +122,15 @@ if __name__ == "__main__":
                 continue
 
             logger.info(f"Board {controller.board_ip} connected. Sending step {step % 4}...")
-
-            # controller.update_params(enabled=True, frequency=5.0, color=[0, 0, 0, 255])
+            # mask = [True] * num_pixels
+            # # only first 4 pixels enabled
+            #
+            # mask = [False, False, True, True, True, True, False, False]
+            #
+            # controller.update_params(
+            #     enabled=True, frequency=10.0, fill=0.10, color=[0, 0, 0, 255], brightness=0.20,
+            #     mask=mask
+            # )
             # break
             
             # Demo logic
