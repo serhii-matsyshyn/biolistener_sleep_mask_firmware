@@ -49,6 +49,7 @@ private:
     std::atomic<bool> _currentState;
 
     std::atomic<uint64_t> _bitmask;
+    std::atomic<bool> _isZeroHz;
     
     QueueHandle_t _eventQueue;
     TaskHandle_t _taskHandle;

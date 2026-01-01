@@ -19,7 +19,7 @@ Strobe::Strobe(uint16_t numPixels, uint8_t pin, neoPixelType type)
       _enabled(false), _currentState(false), _lastUpdateColor(0), 
       _lastUpdateBrightness(-1.0f), _taskHandle(NULL), _eventQueue(NULL), _timerId(-1),
       _intervalOn_us(500000), _intervalOff_us(500000), _lastToggleTime_us(0),
-      _bitmask(0xFFFFFFFFFFFFFFFFULL) {
+      _bitmask(0xFFFFFFFFFFFFFFFFULL), _isZeroHz(false) {
     g_strobeInstance = this;
 }
 
@@ -78,7 +78,13 @@ void Strobe::stop() {
 }
 
 void Strobe::setFrequency(float hz) {
-    if (hz <= 0) hz = 0.1f;
+    if (hz < 0) hz = 0.0f;
+    
+    // Fix race condition: Set flag early if switching TO 0Hz
+    if (hz < 0.001f) {
+        _isZeroHz.store(true);
+    }
+
     if (_frequency.load() != hz) {
         _frequency.store(hz);
         updateIntervals();
@@ -96,17 +102,35 @@ void Strobe::setFillCycle(float fill) {
 
 void Strobe::setColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w) {
     uint32_t newColor = _pixels.Color(r, g, b, w);
-    _color.store(newColor);
+    uint32_t oldColor = _color.exchange(newColor);
+    
+    if (oldColor != newColor && _isZeroHz.load() && _enabled.load()) {
+        StrobeEvent ev = {true};
+        xQueueSend(_eventQueue, &ev, 0);
+    }
 }
 
 void Strobe::setBrightness(float brightness) {
     if (brightness < 0.0f) brightness = 0.0f;
     if (brightness > 1.0f) brightness = 1.0f;
-    _brightness.store(brightness);
+    if (brightness > 1.0f) brightness = 1.0f;
+    
+    float oldBrightness = _brightness.exchange(brightness);
+    if (abs(oldBrightness - brightness) > 0.001f && _isZeroHz.load() && _enabled.load()) {
+        StrobeEvent ev = {true};
+        xQueueSend(_eventQueue, &ev, 0);
+    }
 }
 
 void Strobe::updateIntervals() {
     float freq = _frequency.load();
+    
+    if (freq < 0.001f) {
+        _isZeroHz.store(true);
+        return; // 0Hz (or very close) handled in onTimerTick
+    }
+    _isZeroHz.store(false);
+
     float fill = _fillCycle.load();
     
     uint32_t on_us = (uint32_t)((1000000.0f / freq) * fill);
@@ -120,7 +144,11 @@ void Strobe::updateIntervals() {
 }
 
 void Strobe::setBitmask(uint64_t mask) {
-    _bitmask.store(mask);
+    uint64_t oldMask = _bitmask.exchange(mask);
+    if (oldMask != mask && _isZeroHz.load() && _enabled.load()) {
+        StrobeEvent ev = {true};
+        xQueueSend(_eventQueue, &ev, 0);
+    }
 }
 
 void Strobe::strobeTask(void* parameter) {
@@ -136,6 +164,24 @@ void Strobe::strobeTask(void* parameter) {
 
 void IRAM_ATTR Strobe::onTimerTick() {
     int64_t now = esp_timer_get_time();
+
+    // Handle 0Hz (Always On) - using boolean flag to avoid float in ISR
+    if (_isZeroHz.load()) {
+        if (!_currentState.load()) {
+            _currentState.store(true);
+            if (_enabled.load()) {
+                StrobeEvent ev = {true};
+                BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+                if (xQueueSendFromISR(_eventQueue, &ev, &xHigherPriorityTaskWoken) == pdPASS) {
+                    if (xHigherPriorityTaskWoken == pdTRUE) {
+                        portYIELD_FROM_ISR();
+                    }
+                }
+            }
+        }
+        return;
+    }
+
     int64_t last = _lastToggleTime_us.load();
     int64_t elapsed = now - last;
     uint32_t currentInterval = _currentState.load() ? _intervalOn_us.load() : _intervalOff_us.load();
