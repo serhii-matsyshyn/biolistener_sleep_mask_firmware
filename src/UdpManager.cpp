@@ -1,7 +1,7 @@
 #include "UdpManager.h"
 
-UdpManager::UdpManager(Strobe& strobe, ConfigManager& config, StatusLED& led)
-    : _strobe(strobe), _config(config), _led(led) {
+UdpManager::UdpManager(Strobe& strobe, ConfigManager& config, StatusLED& led, PowerManager& powerManager)
+    : _strobe(strobe), _config(config), _led(led), _powerManager(powerManager) {
     _port = 20000; // Default port
 }
 
@@ -91,6 +91,7 @@ void UdpManager::processPacket(char* data, IPAddress remoteIP, uint16_t remotePo
                 response["fill"] = _strobe.getFillCycle();
                 response["brightness"] = _strobe.getBrightness();
                 response["mask"] = _strobe.getBitmask();
+                response["battery"] = _powerManager.getBatteryVoltage();
                 
                 uint32_t color = _strobe.getColor();
                 JsonArray colorArr = response.createNestedArray("color");

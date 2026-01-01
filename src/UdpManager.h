@@ -7,6 +7,7 @@
 #include "Strobe.h"
 #include "ConfigManager.h"
 #include "StatusLED.h"
+#include "PowerManager.h"
 
 class UdpManager {
 public:
@@ -15,7 +16,7 @@ public:
         CMD_GET_PARAMS = 1
     };
 
-    UdpManager(Strobe& strobe, ConfigManager& config, StatusLED& led);
+    UdpManager(Strobe& strobe, ConfigManager& config, StatusLED& led, PowerManager& powerManager);
     void begin();
     void receiveTask(void* parameter);
     void pingTask(void* parameter);
@@ -24,6 +25,7 @@ private:
     Strobe& _strobe;
     ConfigManager& _config;
     StatusLED& _led;
+    PowerManager& _powerManager;
     WiFiUDP _udp;
     uint16_t _port;
 

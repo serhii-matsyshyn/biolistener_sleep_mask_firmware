@@ -13,14 +13,21 @@
 #define STATUS_LED_PIN 21
 #endif
 
+#ifndef BUTTON_PIN
 #define BUTTON_PIN 10
+#endif
+
+#ifndef BATTERY_PIN
+#define BATTERY_PIN 34
+#endif
+
 #define NUMPIXELS 8
 
 Strobe strobe(NUMPIXELS, LED_PIN, NEO_GRBW + NEO_KHZ800);
 StatusLED statusLed(STATUS_LED_PIN);
 ConfigManager configManager;
-UdpManager udpManager(strobe, configManager, statusLed);
-PowerManager powerManager(BUTTON_PIN, statusLed, strobe);
+PowerManager powerManager(BUTTON_PIN, BATTERY_PIN, statusLed, strobe);
+UdpManager udpManager(strobe, configManager, statusLed, powerManager);
 
 void setup() {
   statusLed.begin();
