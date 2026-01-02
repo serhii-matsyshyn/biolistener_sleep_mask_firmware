@@ -4,6 +4,9 @@ PowerManager::PowerManager(int pin, int batteryPin, StatusLED& statusLed, Strobe
     : _pin(pin), _batteryPin(batteryPin), _statusLed(statusLed), _strobe(strobe), _taskHandle(NULL), _batteryTaskHandle(NULL), _lastBatteryVoltage(0.0f) {}
 
 void PowerManager::begin() {
+    analogSetPinAttenuation(_batteryPin, ADC_0db);
+    analogSetWidth(12);
+
     if (_pin != -1) {
         xTaskCreatePinnedToCore(
             powerTask,
@@ -110,23 +113,32 @@ void PowerManager::powerTask(void* parameter) {
 
 void PowerManager::measureBatteryTask(void* parameter) {
     PowerManager* instance = static_cast<PowerManager*>(parameter);
-    
-    analogSetPinAttenuation(instance->_batteryPin, ADC_0db);
-    analogSetWidth(12);
+
+    float voltageSum = 0.0f;
+    int sampleCount = 0;
 
     for (;;) {
-        // Serial.println("TaskId_ReadBatteryVoltage");
         uint16_t analogReadVal = analogRead(instance->_batteryPin);
-        float batteryVoltage = (analogReadVal * 4.73) / 4096.0; // 4.73 = 1.1 * (330.0 + 100.0) / 100.0;
-        // Serial.printf("Battery voltage: %f\n", batteryVoltage);
+        float currentVoltage = (analogReadVal * 4.73) / 4096.0; // 4.73 = 1.1 * (330.0 + 100.0) / 100.0;
         
-        instance->_lastBatteryVoltage = batteryVoltage;
+        voltageSum += currentVoltage;
+        sampleCount++;
 
-        if (batteryVoltage < 3.3) {
-            instance->_statusLed.setColor(StatusLED::YELLOW);
+        if (sampleCount >= 10) {
+            float averageVoltage = voltageSum / 10.0f;
+            instance->_lastBatteryVoltage = averageVoltage;
+            
+            // Serial.printf("Battery voltage (avg): %f\n", averageVoltage);
+
+            if (averageVoltage < 3.3) {
+                instance->_statusLed.setColor(StatusLED::YELLOW);
+            }
+
+            voltageSum = 0.0f;
+            sampleCount = 0;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
