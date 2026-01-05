@@ -22,6 +22,7 @@ class StrobeEngine:
 
         self.controller = MaskController()
         self.last_params = None
+        self.first_on_time = 0
 
     def _load_sessions(self):
         with open(self.sessions_yaml_path, 'r') as f:
@@ -69,6 +70,14 @@ class StrobeEngine:
                 current_on_duration += (curr_time - prev_time)
 
         self.current_strobe_data = pd.DataFrame(cycles)
+        
+        # Find first ON time
+        first_on = df[df["Torch_State"] == 1]
+        if not first_on.empty:
+            self.first_on_time = first_on.iloc[0]["Time_s"]
+        else:
+            self.first_on_time = 0
+
         return True
 
     def get_params_at_time(self, time_s):
@@ -95,8 +104,11 @@ class StrobeEngine:
 
         # Only send update if parameters changed significantly
         # Strobe is enabled only if both UI toggle is ON and audio is playing
+        # Also check if we passed the first ON time
+        is_active_time = time_s >= self.first_on_time
+        
         current_state = {
-            "enabled": self.enabled and is_playing,
+            "enabled": bool(self.enabled and is_playing and is_active_time),
             "frequency": params["frequency"],
             "fill": params["fill"],
             "brightness": self.brightness,

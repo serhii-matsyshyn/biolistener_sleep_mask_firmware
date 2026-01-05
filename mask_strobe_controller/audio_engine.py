@@ -72,6 +72,12 @@ class AudioEngine:
         self.player.set_time(int(pos * 1000))
 
     def get_current_pos(self):
+        # Check if song ended
+        if self.player.get_state() == vlc.State.Ended:
+            self.is_playing = False
+            self.player.stop()
+            return self.duration
+
         # VLC returns time in milliseconds
         t = self.player.get_time()
         if t < 0:
