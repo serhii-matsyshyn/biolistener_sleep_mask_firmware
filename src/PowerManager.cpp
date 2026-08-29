@@ -5,7 +5,7 @@ PowerManager::PowerManager(int pin, int batteryPin, StatusLED& statusLed, Strobe
 
 void PowerManager::begin() {
     analogSetPinAttenuation(_batteryPin, ADC_0db);
-    analogSetWidth(12);
+    analogReadResolution(12); // analogSetWidth is ESP32-only
 
     if (_pin != -1) {
         xTaskCreatePinnedToCore(
